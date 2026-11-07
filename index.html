@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>شركة السلام جروب - قائمة الأسعار</title>
+  <!-- مكتبة قراءة ملفات الإكسيل -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, sans-serif; }
+    body { background: #e2e8f0; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+    
+    /* إطار الصفحة الرئيسي */
+    .container { 
+      width: 100%; 
+      max-width: 900px; 
+      background: white; 
+      padding: 30px; 
+      border-radius: 16px; 
+      border: 3px solid #1e293b; /* الإطار الكحلي الخارجي */
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
+      position: relative; 
+    }
+    
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    
+    /* زر تسجيل الدخول التمويهي */
+    .login-btn-top { 
+      background: #f1f5f9; 
+      border: 1px solid #cbd5e1; 
+      color: #475569; 
+      padding: 6px 14px; 
+      border-radius: 6px; 
+      font-size: 13px; 
+      cursor: pointer; 
+      transition: 0.2s; 
+    }
+    .login-btn-top:hover { background: #e2e8f0; color: #0f172a; }
+
+    .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; }
+    h1 { color: #1e293b; margin: 0; font-size: 24px; }
+    
+    .btn-download { background: #2563eb; color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; transition: 0.2s; }
+    .btn-download:hover { background: #1d4ed8; }
+
+    /* لوحة الأدمن الحقيقية (تظهر فقط للباسورد الصح) */
+    #adminPanel { display: none; background: #f0fdf4; border: 2px dashed #16a34a; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+    #adminPanel h3 { margin-top: 0; color: #16a34a; font-size: 16px; }
+    .file-input { margin: 10px 0; }
+    .btn-upload { background: #16a34a; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
+    .table-responsive { width: 100%; overflow-x: auto; max-height: 60vh; border-radius: 8px; border: 1px solid #cbd5e1; }
+    table { width: 100%; border-collapse: collapse; text-align: right; background: white; }
+    th, td { padding: 12px 15px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #334155; }
+    th { background: #f8fafc; color: #1e293b; position: sticky; top: 0; z-index: 10; }
+    tr:hover { background: #f1f5f9; }
+    .loading { text-align: center; padding: 40px; color: #64748b; font-size: 16px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  
+  <!-- الجزء العلوي للزرار التمويهي -->
+  <div class="top-bar">
+    <button class="login-btn-top" onclick="handleLogin()">تسجيل الدخول</button>
+  </div>
+
+  <!-- لوحة الأدمن السرية للمحاسب -->
+  <div id="adminPanel">
+    <h3>⚙️ لوحة الأدمن (تحديث قائمة الأسعار)</h3>
+    <p style="font-size: 13px; color: #475569;">اختر ملف الإكسيل الجديد ليتم عرضه فوراً:</p>
+    <input type="file" id="excelFile" class="file-input" accept=".xlsx, .xls">
+    <br>
+    <button class="btn-upload" onclick="uploadNewPriceFile()">حفظ وتحديث الأسعار</button>
+    <button onclick="hideAdminPanel()" style="background:none; border:none; color:#ef4444; cursor:pointer; margin-right: 10px; font-size: 13px;">إغلاق</button>
+  </div>
+
+  <div class="header">
+    <div>
+      <h1>شركة السلام جروب</h1>
+      <p style="margin: 5px 0 0; color: #64748b; font-size: 13px;">أحدث قائمة أسعار معتمدة</p>
+    </div>
+    
+    <div>
+      <a href="price.xlsx" class="btn-download" download="price.xlsx">📥 تحميل نسخة Excel</a>
+    </div>
+  </div>
+
+  <!-- عرض الجدول -->
+  <div class="table-responsive">
+    <div id="loading" class="loading">جاري تحميل وعرض الأسعار...</div>
+    <div id="table-container"></div>
+  </div>
+</div>
+
+<script>
+  // 🔐 كلمة السر الحقيقية للمحاسب
+  const ADMIN_PASSWORD = "Salam2026"; 
+
+  function handleLogin() {
+    let pass = prompt("أدخل كلمة المرور:");
+    if (pass === null) return;
+
+    if (pass === ADMIN_PASSWORD) {
+      // الباسورد صح: نفتح لوحة الرفع
+      document.getElementById('adminPanel').style.display = 'block';
+    } else {
+      // الباسورد غلط: نخدعه ونقوله تم الدخول وبدون أي زرار!
+      alert("تم تسجيل الدخول بنجاح.");
+    }
+  }
+
+  function hideAdminPanel() {
+    document.getElementById('adminPanel').style.display = 'none';
+  }
+
+  // قراءة ملف price.xlsx
+  fetch('price.xlsx')
+    .then(response => {
+      if (!response.ok) throw new Error("الملف غير موجود");
+      return response.arrayBuffer();
+    })
+    .then(data => {
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      
+      const htmlTable = XLSX.utils.sheet_to_html(worksheet, { header: "" });
+      
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('table-container').innerHTML = htmlTable;
+      
+      const table = document.querySelector('#table-container table');
+      if (table) table.className = 'excel-table';
+    })
+    .catch(error => {
+      document.getElementById('loading').innerHTML = "عذراً، لم يتم العثور على ملف الأسعار (price.xlsx).";
+    });
+
+  function uploadNewPriceFile() {
+    alert("تنبيه: لتحديث الملف أونلاين، قم برفع ملف price.xlsx على مستودع GitHub مباشرة.");
+  }
+</script>
+
+</body>
+</html>
